@@ -13,7 +13,7 @@ CXXFLAGS = -std=c++17 -O3 -Wall -D_WIN32 -D_WIN32_WINNT=0x0600 -DUA_ARCHITECTURE
 CFLAGS = -O3 -w -D_WIN32 -D_WIN32_WINNT=0x0600 -DUA_ARCHITECTURE_WIN32
 
 # Librerie di sistema necessarie (ws2_32 e crypt32 sono spesso richieste da open62541 su Windows)
-LIBRARIES = -lws2_32 -lcrypt32
+LIBRARIES = -lws2_32 -lcrypt32 -liphlpapi
 
 # Includiamo il Makefile standard di Webots
 null :=
