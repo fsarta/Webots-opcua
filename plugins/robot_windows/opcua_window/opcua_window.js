@@ -1,18 +1,13 @@
-// opcua_window.js
+import RobotWindow from 'https://cyberbotics.com/wwi/R2025a/RobotWindow.js';
 
-let robotWindow = null;
+let windowRobot = null;
 let discoveredTags = [];
 let mappedTags = {}; // Tiene traccia delle mappature attive: nodeId -> config
 
 window.onload = function() {
-    if (window.robotWindow) {
-        robotWindow = window.robotWindow;
-    } else {
-        document.getElementById("status-indicator").textContent = "Webots API Error";
-        return;
-    }
+    window.robotWindow = new RobotWindow();
 
-    robotWindow.receive = function(message, robot) {
+    window.robotWindow.receive = function(message, robot) {
         if (message.startsWith("STATUS:")) {
             updateStatus(message.substring(7));
         } else if (message.startsWith("TAGS:")) {
@@ -20,18 +15,22 @@ window.onload = function() {
                 discoveredTags = JSON.parse(message.substring(5));
                 renderTagsList();
             } catch (e) {
-                console.error("Errore nel parsing dei tag: ", e);
+                console.error("Error parsing tags: ", e);
             }
         }
     };
 
     document.getElementById("connect-btn").addEventListener("click", () => {
         const ip = document.getElementById("ip-input").value;
-        if (ip && robotWindow) {
+        if (ip && window.robotWindow) {
             updateStatus("CONNECTING...");
-            robotWindow.send("CONNECT:" + ip);
+            window.robotWindow.send("CONNECT:" + ip);
         }
     });
+
+    document.getElementById("status-indicator").textContent = "Disconnected";
+    document.getElementById("status-indicator").className = "status disconnected";
+    console.log("[opcua_window] robotWindow initialized successfully.");
 };
 
 function updateStatus(statusStr) {
@@ -142,7 +141,7 @@ function renderTagsList() {
             
             // Invia al backend C++ nel formato: MAP:nodeId|DIR|TARGET|PARAM
             const mapCmd = `MAP:${tag.nodeId}|${dir}|${target}|${param}`;
-            robotWindow.send(mapCmd);
+            window.robotWindow.send(mapCmd);
             
             // Ricarica la UI per mostrare il badge
             renderTagsList();
@@ -153,7 +152,7 @@ function renderTagsList() {
             btnUnmap.addEventListener("click", (e) => {
                 e.stopPropagation();
                 delete mappedTags[tag.nodeId];
-                robotWindow.send(`UNMAP:${tag.nodeId}`);
+                window.robotWindow.send(`UNMAP:${tag.nodeId}`);
                 renderTagsList();
             });
         }
