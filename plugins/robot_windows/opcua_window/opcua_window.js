@@ -5,9 +5,11 @@ let discoveredTags = [];
 let mappedTags = {}; // Tiene traccia delle mappature attive: nodeId -> config
 
 window.onload = function() {
+    console.log("[opcua_window] Initializing RobotWindow...");
     window.robotWindow = new RobotWindow();
 
     window.robotWindow.receive = function(message, robot) {
+        console.log("[opcua_window] RECEIVED MSG: " + message);
         if (message.startsWith("STATUS:")) {
             updateStatus(message.substring(7));
         } else if (message.startsWith("TAGS:")) {
@@ -22,15 +24,20 @@ window.onload = function() {
 
     document.getElementById("connect-btn").addEventListener("click", () => {
         const ip = document.getElementById("ip-input").value;
+        console.log("[opcua_window] Clicked CONNECT with IP: " + ip);
         if (ip && window.robotWindow) {
             updateStatus("CONNECTING...");
+            console.log("[opcua_window] Sending CONNECT command to C++ controller...");
             window.robotWindow.send("CONNECT:" + ip);
+            console.log("[opcua_window] Send called successfully.");
+        } else {
+            console.error("[opcua_window] Cannot send: invalid IP or window.robotWindow is null.");
         }
     });
 
     document.getElementById("status-indicator").textContent = "Disconnected";
     document.getElementById("status-indicator").className = "status disconnected";
-    console.log("[opcua_window] robotWindow initialized successfully.");
+    console.log("[opcua_window] robotWindow initialized successfully. Waiting for interactions.");
 };
 
 function updateStatus(statusStr) {

@@ -139,8 +139,13 @@ void browseRecursive(UA_Client *client, UA_NodeId startNodeId, std::vector<Disco
     bReq.requestedMaxReferencesPerNode = 0;
     bReq.nodesToBrowse = UA_BrowseDescription_new();
     bReq.nodesToBrowseSize = 1;
-    bReq.nodesToBrowse[0].nodeId = startNodeId;
+    
+    // IMPORTANTE: Deep copy del NodeId per evitare crash su UA_BrowseRequest_clear
+    UA_NodeId_copy(&startNodeId, &bReq.nodesToBrowse[0].nodeId);
     bReq.nodesToBrowse[0].resultMask = UA_BROWSERESULTMASK_ALL;
+    bReq.nodesToBrowse[0].browseDirection = UA_BROWSEDIRECTION_FORWARD;
+
+    std::cout << "[OPC-UA Discovery] Browsing depth " << depth << " Node: " << nodeIdToString(startNodeId) << std::endl;
 
     UA_BrowseResponse bResp = UA_Client_Service_browse(client, bReq);
     for (size_t i = 0; i < bResp.resultsSize; ++i) {
@@ -151,6 +156,7 @@ void browseRecursive(UA_Client *client, UA_NodeId startNodeId, std::vector<Disco
                 tag.name = std::string((char*)ref->browseName.name.data, ref->browseName.name.length);
                 tag.nodeId = nodeIdToString(ref->nodeId.nodeId);
                 tags.push_back(tag);
+                std::cout << "[OPC-UA Discovery] Found Variable: " << tag.name << " (" << tag.nodeId << ")" << std::endl;
             } else if (ref->nodeClass == UA_NODECLASS_OBJECT || ref->nodeClass == UA_NODECLASS_VARIABLETYPE) {
                 browseRecursive(client, ref->nodeId.nodeId, tags, depth + 1);
             }
