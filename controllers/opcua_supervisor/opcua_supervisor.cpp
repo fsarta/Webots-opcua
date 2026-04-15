@@ -25,6 +25,7 @@ using namespace webots;
 struct DiscoveredTag {
     std::string name;
     std::string nodeId;
+    std::string path;
 };
 
 struct MappingConfig {
@@ -132,7 +133,7 @@ void dataChangeNotificationCallback(UA_Client *client, UA_UInt32 subId, void *su
     }
 }
 
-void browseRecursive(UA_Client *client, UA_NodeId startNodeId, std::vector<DiscoveredTag>& tags, int depth = 0) {
+void browseRecursive(UA_Client *client, UA_NodeId startNodeId, std::string currentPath, std::vector<DiscoveredTag>& tags, int depth = 0) {
     if (depth > 5) return;
     UA_BrowseRequest bReq;
     UA_BrowseRequest_init(&bReq);
@@ -155,10 +156,12 @@ void browseRecursive(UA_Client *client, UA_NodeId startNodeId, std::vector<Disco
                 DiscoveredTag tag;
                 tag.name = std::string((char*)ref->browseName.name.data, ref->browseName.name.length);
                 tag.nodeId = nodeIdToString(ref->nodeId.nodeId);
+                tag.path = currentPath + "/" + tag.name;
                 tags.push_back(tag);
-                std::cout << "[OPC-UA Discovery] Found Variable: " << tag.name << " (" << tag.nodeId << ")" << std::endl;
+                std::cout << "[OPC-UA Discovery] Found Variable: " << tag.path << " (" << tag.nodeId << ")" << std::endl;
             } else if (ref->nodeClass == UA_NODECLASS_OBJECT || ref->nodeClass == UA_NODECLASS_VARIABLETYPE) {
-                browseRecursive(client, ref->nodeId.nodeId, tags, depth + 1);
+                std::string childName = std::string((char*)ref->browseName.name.data, ref->browseName.name.length);
+                browseRecursive(client, ref->nodeId.nodeId, currentPath + "/" + childName, tags, depth + 1);
             }
         }
     }
@@ -214,7 +217,7 @@ void opcuaWorkerThread() {
 
                 // Discovery
                 std::vector<DiscoveredTag> tags;
-                browseRecursive(opcua_ctx.client, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), tags);
+                browseRecursive(opcua_ctx.client, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), "Root", tags);
                 {
                     std::lock_guard<std::mutex> lock(opcua_ctx.mutex);
                     opcua_ctx.discovered_tags = tags;
@@ -412,7 +415,9 @@ int main(int argc, char **argv) {
             std::stringstream json;
             json << "TAGS:[";
             for (size_t i = 0; i < tags_copy.size(); ++i) {
-                json << "{\"name\":\"" << tags_copy[i].name << "\", \"nodeId\":\"" << tags_copy[i].nodeId << "\"}";
+                json << "{\"name\":\"" << tags_copy[i].name 
+                     << "\", \"nodeId\":\"" << tags_copy[i].nodeId 
+                     << "\", \"path\":\"" << tags_copy[i].path << "\"}";
                 if (i < tags_copy.size() - 1) json << ",";
             }
             json << "]";

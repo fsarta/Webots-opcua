@@ -60,41 +60,68 @@ function updateStatus(statusStr) {
     }
 }
 
-function renderTagsList() {
-    const container = document.getElementById("tags-list");
-    container.innerHTML = "";
+function buildTree(tags) {
+    const root = { name: "Root", children: {}, tags: [] };
+    
+    tags.forEach(tag => {
+        const parts = tag.path ? tag.path.split('/') : [tag.name];
+        let current = root;
+        
+        for (let i = 0; i < parts.length - 1; i++) {
+            const folderName = parts[i];
+            if (!current.children[folderName]) {
+                current.children[folderName] = { name: folderName, children: {}, tags: [] };
+            }
+            current = current.children[folderName];
+        }
+        
+        current.tags.push(tag);
+    });
+    
+    return root;
+}
 
-    if (discoveredTags.length === 0) {
-        container.innerHTML = '<p class="placeholder-text">No variables found in OPC-UA Server.</p>';
-        return;
-    }
+function renderTree(nodeDom, treeNode, isRoot = false) {
+    // Ordina cartelle
+    const folderKeys = Object.keys(treeNode.children).sort();
+    folderKeys.forEach(key => {
+        const childNode = treeNode.children[key];
+        
+        const details = document.createElement("details");
+        details.className = "tree-folder";
+        if (isRoot || Object.keys(childNode.children).length > 0) details.open = true;
+        
+        const summary = document.createElement("summary");
+        summary.innerHTML = `📁 ${key}`;
+        details.appendChild(summary);
+        
+        renderTree(details, childNode, false);
+        nodeDom.appendChild(details);
+    });
 
-    discoveredTags.forEach(tag => {
+    // Ordina e rendi le variabili
+    treeNode.tags.sort((a,b) => a.name.localeCompare(b.name)).forEach(tag => {
         const isMapped = mappedTags[tag.nodeId] !== undefined;
         
         const div = document.createElement("div");
         div.className = `tag-item ${isMapped ? 'mapped' : ''}`;
         div.id = `tag-${tag.nodeId.replace(/[^a-zA-Z0-9]/g, '-')}`;
 
-        // Header (cliccabile per espandere/collassare la config)
         const header = document.createElement("div");
         header.className = "tag-header";
         
-        const infoHtml = `
+        header.innerHTML = `
             <div>
                 ${isMapped ? '<span class="tag-status-badge">MAPPED</span>' : ''}
-                <span class="tag-name">${tag.name}</span>
+                <span class="tag-name">📄 ${tag.name}</span>
                 <span class="tag-node-id">(${tag.nodeId})</span>
             </div>
-            <button class="btn-small">⚙️ Config</button>
+            <button class="btn-small btn-config">⚙️ Config</button>
         `;
-        header.innerHTML = infoHtml;
         
-        // Config Panel (Nascosto di default)
         const configPanel = document.createElement("div");
         configPanel.className = "tag-config";
         
-        // Recupera valori precedenti se già mappato
         const currentConf = mappedTags[tag.nodeId] || { dir: 'OPC_TO_WEBOTS', target: tag.name, param: 'MOTOR_POS' };
 
         configPanel.innerHTML = `
@@ -106,7 +133,7 @@ function renderTagsList() {
                 </select>
             </div>
             <div class="config-group">
-                <label>Webots Node/Device Name</label>
+                <label>Node DEF Name</label>
                 <input type="text" class="map-target" value="${currentConf.target}" placeholder="e.g. motor_1">
             </div>
             <div class="config-group">
@@ -122,42 +149,35 @@ function renderTagsList() {
             </div>
             <div class="config-group" style="flex-grow: 0; justify-content: flex-end; flex-direction: row; gap: 5px;">
                 ${isMapped ? `<button class="btn-small btn-unmap">Unmap</button>` : ''}
-                <button class="btn-small btn-apply">Apply Mapping</button>
+                <button class="btn-small btn-apply">Apply</button>
             </div>
         `;
 
-        // Logica di espansione
-        header.addEventListener("click", () => {
+        // Toggle Config Panel
+        const btnConfig = header.querySelector('.btn-config');
+        btnConfig.addEventListener("click", (e) => {
             const isVisible = configPanel.style.display === "flex";
             configPanel.style.display = isVisible ? "none" : "flex";
         });
 
-        // Logica pulsanti Config
+        // Apply Mapping
         const btnApply = configPanel.querySelector('.btn-apply');
         btnApply.addEventListener("click", (e) => {
-            e.stopPropagation(); // Evita il click sull'header
-            
             const dir = configPanel.querySelector('.map-dir').value;
             const target = configPanel.querySelector('.map-target').value;
             const param = configPanel.querySelector('.map-param').value;
             
             if(!target) { alert("Inserisci il nome del nodo/device Webots!"); return; }
 
-            // Salva nello stato locale UI
             mappedTags[tag.nodeId] = { dir, target, param };
-            
-            // Invia al backend C++ nel formato: MAP:nodeId|DIR|TARGET|PARAM
             const mapCmd = `MAP:${tag.nodeId}|${dir}|${target}|${param}`;
             window.robotWindow.send(mapCmd);
-            
-            // Ricarica la UI per mostrare il badge
             renderTagsList();
         });
 
         const btnUnmap = configPanel.querySelector('.btn-unmap');
         if (btnUnmap) {
             btnUnmap.addEventListener("click", (e) => {
-                e.stopPropagation();
                 delete mappedTags[tag.nodeId];
                 window.robotWindow.send(`UNMAP:${tag.nodeId}`);
                 renderTagsList();
@@ -166,6 +186,23 @@ function renderTagsList() {
 
         div.appendChild(header);
         div.appendChild(configPanel);
-        container.appendChild(div);
+        nodeDom.appendChild(div);
     });
+}
+
+function renderTagsList() {
+    const container = document.getElementById("tags-list");
+    container.innerHTML = "";
+
+    if (discoveredTags.length === 0) {
+        container.innerHTML = '<p class="placeholder-text">No variables found in OPC-UA Server.</p>';
+        return;
+    }
+
+    const treeData = buildTree(discoveredTags);
+    const rootDom = document.createElement("div");
+    rootDom.className = "tree-root";
+    
+    renderTree(rootDom, treeData, true);
+    container.appendChild(rootDom);
 }
