@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" type="text/css" href="opcua_window.css">
+    <title>OPC-UA Supervisor</title>
+</head>
+<body>
+    <div class="container">
+        <h2>OPC-UA Configuration Panel</h2>
+        
+        <!-- Connection Section -->
+        <div class="section-box">
+            <div class="connection-panel">
+                <label for="ip-input">Server Endpoint:</label>
+                <input type="text" id="ip-input" value="opc.tcp://127.0.0.1:4840" placeholder="opc.tcp://IP:PORT">
+                <button id="connect-btn">Connect</button>
+            </div>
+            <div id="status-indicator" class="status disconnected">Disconnected</div>
+        </div>
+
+        <!-- Tags & Mapping Section -->
+        <div class="section-box">
+            <h3>Discovered Tags & Mapping</h3>
+            <div class="tags-panel" id="tags-list">
+                <p class="placeholder-text">Connect to a server to discover tags...</p>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="opcua_window.js"></script>
+</body>
+</html>
