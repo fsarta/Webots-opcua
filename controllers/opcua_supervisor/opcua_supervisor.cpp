@@ -446,7 +446,7 @@ int main(int argc, char **argv) {
                         Node *node = supervisor->getFromDef(cfg.target);
                         if (node) {
                             Field *transField = node->getField("translation");
-                            if (transField && transField->getType() == Node::SF_VEC3F) {
+                            if (transField && transField->getType() == Field::SF_VEC3F) {
                                 const double *current = transField->getSFVec3f();
                                 double next[3] = { current[0], current[1], current[2] };
                                 if (cfg.param == "TRANS_X") next[0] = val;
@@ -469,7 +469,7 @@ int main(int argc, char **argv) {
                     Node *node = supervisor->getFromDef(cfg.target);
                     if (node) {
                         Field *transField = node->getField("translation");
-                        if (transField && transField->getType() == Node::SF_VEC3F) {
+                        if (transField && transField->getType() == Field::SF_VEC3F) {
                             const double *current = transField->getSFVec3f();
                             if (cfg.param == "TRANS_X") out_values[nodeIdStr] = current[0];
                             else if (cfg.param == "TRANS_Y") out_values[nodeIdStr] = current[1];
