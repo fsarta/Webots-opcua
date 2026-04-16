@@ -5,6 +5,7 @@
 #include <webots/Motor.hpp>
 #include <webots/PositionSensor.hpp>
 #include <iostream>
+#include <fstream>
 #include <thread>
 #include <mutex>
 #include <atomic>
@@ -76,6 +77,41 @@ std::vector<std::string> splitString(const std::string &s, char delim) {
         result.push_back(item);
     }
     return result;
+}
+
+void saveMappingToFile(const std::string& endpoint, const std::unordered_map<std::string, MappingConfig>& mappings) {
+    std::ofstream outFile("opcua_mapping.config");
+    if (outFile.is_open()) {
+        outFile << "ENDPOINT|" << endpoint << "\n";
+        for (const auto& pair : mappings) {
+            outFile << "MAP|" << pair.first << "|" << pair.second.dir << "|" << pair.second.target << "|" << pair.second.param << "\n";
+        }
+        outFile.close();
+        std::cout << "[CONFIG] Saved configuration to opcua_mapping.config" << std::endl;
+    } else {
+        std::cerr << "[CONFIG] Error: Could not open file for writing!" << std::endl;
+    }
+}
+
+void loadMappingFromFile(std::string& endpoint, std::unordered_map<std::string, MappingConfig>& mappings) {
+    std::ifstream inFile("opcua_mapping.config");
+    if (inFile.is_open()) {
+        std::string line;
+        mappings.clear();
+        while (std::getline(inFile, line)) {
+            auto parts = splitString(line, '|');
+            if (parts.size() >= 2 && parts[0] == "ENDPOINT") {
+                endpoint = parts[1];
+            } else if (parts.size() == 5 && parts[0] == "MAP") {
+                MappingConfig cfg = { parts[2], parts[3], parts[4] };
+                mappings[parts[1]] = cfg;
+            }
+        }
+        inFile.close();
+        std::cout << "[CONFIG] Loaded configuration from opcua_mapping.config" << std::endl;
+    } else {
+        std::cout << "[CONFIG] No configuration file found (opcua_mapping.config)." << std::endl;
+    }
 }
 
 std::string nodeIdToString(const UA_NodeId& nodeId) {
@@ -339,6 +375,9 @@ int main(int argc, char **argv) {
     bool last_error = false;
     
     std::unordered_map<std::string, MappingConfig> active_mappings;
+    
+    // Auto-caricamento all'avvio
+    loadMappingFromFile(opcua_ctx.endpoint_url, active_mappings);
 
     while (supervisor->step(timeStep) != -1) {
         
@@ -352,6 +391,42 @@ int main(int argc, char **argv) {
                 opcua_ctx.connected = false;
                 opcua_ctx.connection_error = false;
             } 
+            else if (message == "DISCONNECT") {
+                std::lock_guard<std::mutex> lock(opcua_ctx.mutex);
+                opcua_ctx.disconnect_requested = true;
+            }
+            else if (message == "SAVE_CONFIG") {
+                saveMappingToFile(opcua_ctx.endpoint_url, active_mappings);
+            }
+            else if (message == "LOAD_CONFIG") {
+                loadMappingFromFile(opcua_ctx.endpoint_url, active_mappings);
+                // Dopo il caricamento, forziamo il refresh nella UI (lo faremo dopo con MAPPINGS:)
+                // e applichiamo le sottoscrizioni
+                for (const auto& pair : active_mappings) {
+                    if (pair.second.dir == "OPC_TO_WEBOTS") {
+                        std::lock_guard<std::mutex> lock(opcua_ctx.mutex);
+                        opcua_ctx.pending_subscribes.push_back(pair.first);
+                    } else if (pair.second.dir == "WEBOTS_TO_OPC" && pair.second.param == "SENSOR_VAL") {
+                        PositionSensor *sensor = supervisor->getPositionSensor(pair.second.target);
+                        if (sensor) sensor->enable(timeStep);
+                    }
+                }
+                
+                // Comunica l'URL caricato alla UI
+                supervisor->wwiSendText("CONFIG_URL:" + opcua_ctx.endpoint_url);
+                
+                // Invia le mappature caricate alla UI
+                std::stringstream json;
+                json << "MAPPINGS:{";
+                for (auto it = active_mappings.begin(); it != active_mappings.end(); ++it) {
+                    json << "\"" << it->first << "\":{\"dir\":\"" << it->second.dir 
+                         << "\", \"target\":\"" << it->second.target 
+                         << "\", \"param\":\"" << it->second.param << "\"}";
+                    if (std::next(it) != active_mappings.end()) json << ",";
+                }
+                json << "}";
+                supervisor->wwiSendText(json.str());
+            }
             else if (message.rfind("MAP:", 0) == 0) {
                 // Formato: MAP:nodeId|DIR|TARGET|PARAM
                 std::string data = message.substr(4);
@@ -422,6 +497,19 @@ int main(int argc, char **argv) {
             }
             json << "]";
             supervisor->wwiSendText(json.str());
+            
+            // Ogni volta che riceviamo i TAGS, inviamo anche le mappature attive per colorare la UI
+            // utile soprattutto dopo il caricamento della configurazione o ricaricamento finestra
+            std::stringstream jsonMap;
+            jsonMap << "MAPPINGS:{";
+            for (auto it = active_mappings.begin(); it != active_mappings.end(); ++it) {
+                jsonMap << "\"" << it->first << "\":{\"dir\":\"" << it->second.dir 
+                     << "\", \"target\":\"" << it->second.target 
+                     << "\", \"param\":\"" << it->second.param << "\"}";
+                if (std::next(it) != active_mappings.end()) jsonMap << ",";
+            }
+            jsonMap << "}";
+            supervisor->wwiSendText(jsonMap.str());
         }
 
         // 3. ESECUZIONE DELLA MAPPATURA (Lettura/Scrittura HARD REAL-TIME)
@@ -494,6 +582,20 @@ int main(int argc, char **argv) {
         // Passa i dati in uscita al thread OPC-UA in modo protetto
         if (!out_values.empty()) {
             std::lock_guard<std::mutex> lock(opcua_ctx.mutex);
+            for (const auto& out : out_values) {
+                opcua_ctx.webots_to_opc_values[out.first] = out.second;
+            }
+        }
+    }
+
+    opcua_ctx.running = false;
+    if (opcua_thread.joinable()) {
+        opcua_thread.join();
+    }
+
+    delete supervisor;
+    return 0;
+}x.mutex);
             for (const auto& out : out_values) {
                 opcua_ctx.webots_to_opc_values[out.first] = out.second;
             }

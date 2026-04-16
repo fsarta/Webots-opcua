@@ -19,6 +19,15 @@ window.onload = function() {
             } catch (e) {
                 console.error("Error parsing tags: ", e);
             }
+        } else if (message.startsWith("MAPPINGS:")) {
+            try {
+                mappedTags = JSON.parse(message.substring(9));
+                renderTagsList();
+            } catch (e) {
+                console.error("Error parsing mappings: ", e);
+            }
+        } else if (message.startsWith("CONFIG_URL:")) {
+            document.getElementById("ip-input").value = message.substring(11);
         }
     };
 
@@ -35,28 +44,52 @@ window.onload = function() {
         }
     });
 
+    document.getElementById("save-btn").addEventListener("click", () => {
+        window.robotWindow.send("SAVE_CONFIG");
+        console.log("[opcua_window] Sent SAVE_CONFIG command.");
+    });
+
+    document.getElementById("load-btn").addEventListener("click", () => {
+        window.robotWindow.send("LOAD_CONFIG");
+        console.log("[opcua_window] Sent LOAD_CONFIG command.");
+    });
+
     document.getElementById("status-indicator").textContent = "Disconnected";
     document.getElementById("status-indicator").className = "status disconnected";
     console.log("[opcua_window] robotWindow initialized successfully. Waiting for interactions.");
+
+    // Carica configurazione all'avvio
+    setTimeout(() => {
+        if (window.robotWindow) window.robotWindow.send("LOAD_CONFIG");
+    }, 500);
 };
 
 function updateStatus(statusStr) {
     const statusEl = document.getElementById("status-indicator");
-    const btn = document.getElementById("connect-btn");
+    const connectBtn = document.getElementById("connect-btn");
+    const disconnectBtn = document.getElementById("disconnect-btn");
     
     if (statusStr === "CONNECTED") {
         statusEl.textContent = "Connected";
         statusEl.className = "status connected";
-        btn.disabled = true;
+        connectBtn.style.display = "none";
+        disconnectBtn.style.display = "inline-block";
     } else if (statusStr === "DISCONNECTED" || statusStr === "ERROR") {
         statusEl.textContent = statusStr === "ERROR" ? "Connection Error" : "Disconnected";
         statusEl.className = "status disconnected";
-        btn.disabled = false;
-        // In caso di disconnessione manteniamo le UI ma segniamo lo stato
+        connectBtn.style.display = "inline-block";
+        connectBtn.disabled = false;
+        disconnectBtn.style.display = "none";
+        
+        // Se ci disconnettiamo, puliamo la lista dei tag (opzionale, o li lasciamo in grigio)
+        if (statusStr === "DISCONNECTED") {
+            discoveredTags = [];
+            renderTagsList();
+        }
     } else if (statusStr === "CONNECTING...") {
         statusEl.textContent = "Connecting...";
         statusEl.className = "status connecting";
-        btn.disabled = true;
+        connectBtn.disabled = true;
     }
 }
 

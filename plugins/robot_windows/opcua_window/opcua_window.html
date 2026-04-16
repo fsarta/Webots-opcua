@@ -15,8 +15,14 @@
                 <label for="ip-input">Server Endpoint:</label>
                 <input type="text" id="ip-input" value="opc.tcp://127.0.0.1:4840" placeholder="opc.tcp://IP:PORT">
                 <button id="connect-btn">Connect</button>
+                <button id="disconnect-btn" class="btn-unmap" style="display: none;">Disconnect</button>
             </div>
             <div id="status-indicator" class="status disconnected">Disconnected</div>
+            
+            <div class="config-actions" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; display: flex; gap: 10px;">
+                <button id="save-btn" class="btn-secondary">💾 Save Config</button>
+                <button id="load-btn" class="btn-secondary">📂 Load Config</button>
+            </div>
         </div>
 
         <!-- Tags & Mapping Section -->
