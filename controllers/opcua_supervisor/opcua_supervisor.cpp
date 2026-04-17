@@ -173,7 +173,10 @@ void opcuaWorkerThread() {
         std::string current_url; double current_pub = 10.0; bool do_connect = false;
         {
             std::lock_guard<std::mutex> lock(opcua_ctx.mutex);
-            if (opcua_ctx.connect_requested) { current_url = opcua_ctx.endpoint_url; current_pub = opcua_ctx.publishing_interval; opcua_ctx.connect_requested = false; opcua_ctx.disconnect_requested = false; do_connect = true; }
+            if (opcua_ctx.connect_requested) { 
+                if (opcua_ctx.connected) { UA_Client_disconnect(opcua_ctx.client); opcua_ctx.connected = false; }
+                current_url = opcua_ctx.endpoint_url; current_pub = opcua_ctx.publishing_interval; opcua_ctx.connect_requested = false; opcua_ctx.disconnect_requested = false; do_connect = true; 
+            }
             else if (opcua_ctx.disconnect_requested) { if (opcua_ctx.connected) { UA_Client_disconnect(opcua_ctx.client); opcua_ctx.connected = false; opcua_ctx.connection_error = false; } opcua_ctx.disconnect_requested = false; }
             else if (!opcua_ctx.connected && !opcua_ctx.endpoint_url.empty() && opcua_ctx.connection_error) {
                 auto now = std::chrono::steady_clock::now();
@@ -249,6 +252,7 @@ int main(int argc, char **argv) {
                 opcua_ctx.endpoint_url = parts[0];
                 if (parts.size() > 1) opcua_ctx.publishing_interval = std::stod(parts[1]);
                 opcua_ctx.connect_requested = true;
+                last_connected = false; // Forziamo update interfaccia alla nuova connessione
             } 
             else if (message == "DISCONNECT") { std::lock_guard<std::mutex> lock(opcua_ctx.mutex); opcua_ctx.disconnect_requested = true; }
             else if (message == "SAVE_CONFIG") saveMappingToFile(opcua_ctx.endpoint_url, opcua_ctx.publishing_interval, active_mappings);

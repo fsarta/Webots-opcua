@@ -3,6 +3,7 @@ import RobotWindow from 'https://cyberbotics.com/wwi/R2025a/RobotWindow.js';
 let discoveredTags = [];
 let mappedTags = {}; 
 let lastValues = {};
+if (!window.openFolders) window.openFolders = new Set();
 
 window.onload = function() {
     window.robotWindow = new RobotWindow();
@@ -12,12 +13,18 @@ window.onload = function() {
             updateStatus(message.substring(7));
         } else if (message.startsWith("TAGS:")) {
             try {
-                discoveredTags = JSON.parse(message.substring(5));
+                const tagsStr = message.substring(5);
+                if (window._lastTagsStr === tagsStr) return; // Prevent continuous UI re-renders
+                window._lastTagsStr = tagsStr;
+                discoveredTags = JSON.parse(tagsStr);
                 renderTagsList();
             } catch (e) { console.error("Error parsing tags", e); }
         } else if (message.startsWith("MAPPINGS:")) {
             try {
-                mappedTags = JSON.parse(message.substring(9));
+                const mapStr = message.substring(9);
+                if (window._lastMapStr === mapStr) return; // Prevent continuous UI re-renders
+                window._lastMapStr = mapStr;
+                mappedTags = JSON.parse(mapStr);
                 renderTagsList();
                 renderMappingsTable();
             } catch (e) { console.error("Error parsing mappings", e); }
@@ -134,17 +141,25 @@ function buildTree(tags) {
     return root;
 }
 
-function renderTree(nodeDom, treeNode, isRoot = false) {
+function renderTree(nodeDom, treeNode, currentPath = "Root", isRoot = false) {
     const folderKeys = Object.keys(treeNode.children).sort();
     folderKeys.forEach(key => {
         const childNode = treeNode.children[key];
         const details = document.createElement("details");
         details.className = "tree-folder";
-        if (isRoot) details.open = true;
+        
+        const path = currentPath + "/" + key;
+        if (isRoot || window.openFolders.has(path)) details.open = true;
+        
+        details.addEventListener("toggle", () => {
+            if (details.open) window.openFolders.add(path);
+            else window.openFolders.delete(path);
+        });
+
         const summary = document.createElement("summary");
         summary.innerHTML = `📁 ${key}`;
         details.appendChild(summary);
-        renderTree(details, childNode, false);
+        renderTree(details, childNode, path, false);
         nodeDom.appendChild(details);
     });
 
@@ -216,6 +231,6 @@ function renderTagsList() {
     const treeData = buildTree(discoveredTags);
     const rootDom = document.createElement("div");
     rootDom.className = "tree-root";
-    renderTree(rootDom, treeData, true);
+    renderTree(rootDom, treeData, "Root", true);
     container.appendChild(rootDom);
 }
