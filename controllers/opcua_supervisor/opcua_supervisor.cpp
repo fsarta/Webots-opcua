@@ -173,9 +173,26 @@ void opcuaWorkerThread() {
         std::string current_url; double current_pub = 10.0; bool do_connect = false;
         {
             std::lock_guard<std::mutex> lock(opcua_ctx.mutex);
+<<<<<<< HEAD
             if (opcua_ctx.connect_requested) { current_url = opcua_ctx.endpoint_url; current_pub = opcua_ctx.publishing_interval; opcua_ctx.connect_requested = false; opcua_ctx.disconnect_requested = false; do_connect = true; }
             else if (opcua_ctx.disconnect_requested) { if (opcua_ctx.connected) { UA_Client_disconnect(opcua_ctx.client); opcua_ctx.connected = false; opcua_ctx.connection_error = false; } opcua_ctx.disconnect_requested = false; }
             else if (!opcua_ctx.connected && !opcua_ctx.endpoint_url.empty() && opcua_ctx.connection_error) {
+=======
+            if (opcua_ctx.disconnect_requested) {
+                if (opcua_ctx.connected) {
+                    UA_Client_disconnect(opcua_ctx.client);
+                    opcua_ctx.connected = false;
+                    opcua_ctx.connection_error = false;
+                    std::cout << "[OPC-UA Thread] Disconnessione manuale." << std::endl;
+                }
+                opcua_ctx.disconnect_requested = false;
+            } else if (opcua_ctx.connect_requested) {
+                current_url = opcua_ctx.endpoint_url;
+                opcua_ctx.connect_requested = false;
+                do_connect = true;
+            } else if (!opcua_ctx.connected && !opcua_ctx.endpoint_url.empty() && opcua_ctx.connection_error) {
+                // Logica di Auto-Riconnessione (Watchdog: prova ogni 2 secondi)
+>>>>>>> 8d7cd4ef42b30c6de0e8ef212ae1e9bb3e6beb41
                 auto now = std::chrono::steady_clock::now();
                 if (std::chrono::duration_cast<std::chrono::seconds>(now - last_reconnect_attempt).count() > 2) { current_url = opcua_ctx.endpoint_url; current_pub = opcua_ctx.publishing_interval; do_connect = true; last_reconnect_attempt = now; }
             }
@@ -329,6 +346,17 @@ int main(int argc, char **argv) {
             }
         }
     }
+<<<<<<< HEAD
     opcua_ctx.running = false; if (opcua_thread.joinable()) opcua_thread.join();
     delete supervisor; return 0;
+=======
+
+    opcua_ctx.running = false;
+    if (opcua_thread.joinable()) {
+        opcua_thread.join();
+    }
+
+    delete supervisor;
+    return 0;
+>>>>>>> 8d7cd4ef42b30c6de0e8ef212ae1e9bb3e6beb41
 }
