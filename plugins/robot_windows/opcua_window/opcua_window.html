@@ -12,8 +12,10 @@
         <!-- Connection Section -->
         <div class="section-box">
             <div class="connection-panel">
-                <label for="ip-input">Server Endpoint:</label>
+                <label for="ip-input">Server:</label>
                 <input type="text" id="ip-input" value="opc.tcp://127.0.0.1:4840" placeholder="opc.tcp://IP:PORT">
+                <label for="pub-input">Pub. Int. (ms):</label>
+                <input type="number" id="pub-input" value="10" step="5" min="5" style="width: 60px;">
                 <button id="connect-btn">Connect</button>
                 <button id="disconnect-btn" class="btn-unmap" style="display: none;">Disconnect</button>
             </div>
@@ -23,6 +25,24 @@
                 <button id="save-btn" class="btn-secondary">💾 Save Config</button>
                 <button id="load-btn" class="btn-secondary">📂 Load Config</button>
             </div>
+        </div>
+
+        <!-- Active Mappings Table -->
+        <div class="section-box" id="active-mappings-section" style="display: none;">
+            <h3>Active Mappings</h3>
+            <table class="mappings-table">
+                <thead>
+                    <tr>
+                        <th>OPC Node</th>
+                        <th>Direction</th>
+                        <th>Webots Target</th>
+                        <th>Param</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="mappings-table-body">
+                </tbody>
+            </table>
         </div>
 
         <!-- Tags & Mapping Section -->
