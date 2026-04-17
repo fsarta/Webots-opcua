@@ -40,6 +40,7 @@ struct OpcUaContext {
     
     // Connessione e Watchdog
     std::atomic<bool> connect_requested{false};
+    std::atomic<bool> disconnect_requested{false};
     std::string endpoint_url;
     std::atomic<bool> connected{false};
     std::atomic<bool> connection_error{false};
@@ -221,7 +222,15 @@ void opcuaWorkerThread() {
 
         {
             std::lock_guard<std::mutex> lock(opcua_ctx.mutex);
-            if (opcua_ctx.connect_requested) {
+            if (opcua_ctx.disconnect_requested) {
+                if (opcua_ctx.connected) {
+                    UA_Client_disconnect(opcua_ctx.client);
+                    opcua_ctx.connected = false;
+                    opcua_ctx.connection_error = false;
+                    std::cout << "[OPC-UA Thread] Disconnessione manuale." << std::endl;
+                }
+                opcua_ctx.disconnect_requested = false;
+            } else if (opcua_ctx.connect_requested) {
                 current_url = opcua_ctx.endpoint_url;
                 opcua_ctx.connect_requested = false;
                 do_connect = true;
@@ -582,20 +591,6 @@ int main(int argc, char **argv) {
         // Passa i dati in uscita al thread OPC-UA in modo protetto
         if (!out_values.empty()) {
             std::lock_guard<std::mutex> lock(opcua_ctx.mutex);
-            for (const auto& out : out_values) {
-                opcua_ctx.webots_to_opc_values[out.first] = out.second;
-            }
-        }
-    }
-
-    opcua_ctx.running = false;
-    if (opcua_thread.joinable()) {
-        opcua_thread.join();
-    }
-
-    delete supervisor;
-    return 0;
-}x.mutex);
             for (const auto& out : out_values) {
                 opcua_ctx.webots_to_opc_values[out.first] = out.second;
             }
